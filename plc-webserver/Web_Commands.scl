@@ -1,0 +1,26 @@
+// Web page commands -> V20 control word
+// Create an SCL FC "Web_Commands" with this code and call it in Main [OB1].
+// The web page only sets Cmd_Start / Cmd_stop to TRUE; this code handles them and resets them.
+
+// Permanent "ready" bits a V20 needs to run (1 = not active for Off2/Off3)
+"Write_Master_DB".Control_Word1."Control from PLC" := TRUE;
+"Write_Master_DB".Control_Word1."Off2: electrical stop" := TRUE;
+"Write_Master_DB".Control_Word1."Off3: fast stop" := TRUE;
+"Write_Master_DB".Control_Word1."Pulse enable" := TRUE;
+"Write_Master_DB".Control_Word1."RFG enable" := TRUE;
+"Write_Master_DB".Control_Word1."RFG start" := TRUE;
+"Write_Master_DB".Control_Word1."Setpoint enable" := TRUE;
+
+IF "Write_Master_DB".Cmd_Start THEN
+    "Write_Master_DB".Control_Word1."On/Off1" := TRUE;
+    "Write_Master_DB".Cmd_Start := FALSE;
+END_IF;
+
+// Stop wins over start
+IF "Write_Master_DB".Cmd_stop THEN
+    "Write_Master_DB".Control_Word1."On/Off1" := FALSE;
+    "Write_Master_DB".Cmd_stop := FALSE;
+END_IF;
+
+// Limit the setpoint coming from the web page
+"Write_Master_DB".Setpoint_Freq_Hz := LIMIT(MN := 0.0, IN := "Write_Master_DB".Setpoint_Freq_Hz, MX := 50.0);

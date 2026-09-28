@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>V20 Drive Control</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: #15191e; color: #e6e9ed; }
+  header { display: flex; justify-content: space-between; align-items: center;
+           padding: 14px 20px; background: #1f252c; border-bottom: 3px solid #009999; }
+  h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+  .conn { font-size: 13px; padding: 4px 10px; border-radius: 12px; background: #444; }
+  .conn.ok { background: #1e7d3a; } .conn.err { background: #a52a2a; }
+  main { max-width: 900px; margin: 20px auto; padding: 0 16px;
+         display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+  .card { background: #1f252c; border-radius: 10px; padding: 20px; }
+  .big { font-size: 64px; font-weight: 300; text-align: center; font-variant-numeric: tabular-nums; }
+  .big small { font-size: 22px; margin-left: 6px; color: #9aa4ad; }
+  .bar { height: 10px; background: #2c343d; border-radius: 5px; overflow: hidden; margin: 10px 0 18px; }
+  .bar div { height: 100%; width: 0; background: #00b3b3; transition: width .4s; }
+  .lamps { display: flex; justify-content: space-around; margin-bottom: 14px; }
+  .lamp { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; color: #9aa4ad; }
+  .lamp i { width: 22px; height: 22px; border-radius: 50%; background: #3a434d; }
+  .lamp i.green { background: #2ecc71; box-shadow: 0 0 10px #2ecc71; }
+  .lamp i.red { background: #e74c3c; box-shadow: 0 0 10px #e74c3c; }
+  .lamp i.blue { background: #3498db; box-shadow: 0 0 10px #3498db; }
+  .meta { text-align: center; font-size: 13px; color: #9aa4ad; line-height: 1.7; }
+  .meta b { color: #e6e9ed; }
+  .buttons { display: flex; gap: 12px; margin-bottom: 22px; }
+  button { border: 0; border-radius: 8px; color: #fff; font-size: 18px; font-weight: 600;
+           padding: 16px; cursor: pointer; flex: 1; }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .5; cursor: wait; }
+  .start { background: #1e8e3e; } .stop { background: #c0392b; }
+  .set { background: #007f7f; width: 100%; font-size: 15px; padding: 12px; }
+  .rev { background: #2c6fa8; width: 100%; font-size: 15px; padding: 12px; margin-bottom: 22px; }
+  .rev.on { background: #d68910; }
+  .reset { background: #5a6570; width: 100%; font-size: 14px; padding: 10px; margin-top: 10px; }
+  label { font-size: 13px; color: #9aa4ad; }
+  .sp { display: flex; align-items: center; gap: 10px; margin: 8px 0 12px; }
+  .sp input[type=range] { flex: 1; accent-color: #00b3b3; }
+  .sp input[type=number] { width: 80px; padding: 6px; background: #15191e; color: #e6e9ed;
+                           border: 1px solid #3a434d; border-radius: 6px; font-size: 15px; }
+  .msg { min-height: 1.2em; font-size: 13px; color: #9aa4ad; margin: 10px 0 0; }
+  .wide { grid-column: 1 / -1; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .card-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .legend { font-size: 12px; color: #9aa4ad; display: flex; gap: 14px; align-items: center; }
+  .legend i { display: inline-block; width: 16px; height: 3px; margin-right: 5px; vertical-align: middle; }
+  .range button { flex: none; font-size: 12px; padding: 4px 10px; background: #2c343d; margin-left: 4px; }
+  .range button.on { background: #007f7f; }
+  #chart { width: 100%; height: 260px; display: block; }
+  .events { list-style: none; margin: 0; padding: 0; font-size: 13px; max-height: 220px; overflow-y: auto; }
+  .events li { padding: 5px 0; border-bottom: 1px solid #2c343d; }
+  .events time { color: #9aa4ad; margin-right: 8px; font-variant-numeric: tabular-nums; }
+  .files a { display: block; color: #4fd1d1; font-size: 13px; padding: 4px 0; text-decoration: none; }
+  .files a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>V20 Drive</h1>
+  <span id="conn" class="conn">connecting…</span>
+</header>
+<main>
+  <section class="card">
+    <div class="big"><span id="freq">--.-</span><small>Hz</small></div>
+    <div class="bar"><div id="freqBar"></div></div>
+    <div class="lamps">
+      <div class="lamp"><i id="lampRun"></i>Running</div>
+      <div class="lamp"><i id="lampFault"></i>Fault</div>
+      <div class="lamp"><i id="lampDir"></i><span id="dirText">Direction</span></div>
+    </div>
+    <div class="meta">
+      Temperature <b id="temp">--</b> °C · Pressure <b id="press">--</b><br>
+      Setpoint in PLC <b id="spPlc">--</b> Hz · Control word <b id="cw">----</b>
+    </div>
+  </section>
+  <section class="card">
+    <div class="buttons">
+      <button id="btnStart" class="start">START</button>
+      <button id="btnStop" class="stop">STOP</button>
+    </div>
+    <button id="btnRev" class="rev">REVERSE ⇄</button>
+    <label for="spSlider">Speed setpoint</label>
+    <div class="sp">
+      <input id="spSlider" type="range" min="0" max="50" step="0.5" value="0">
+      <input id="spNum" type="number" min="0" max="50" step="0.1" value="0">
+      <span>Hz</span>
+    </div>
+    <button id="btnSet" class="set">Send setpoint</button>
+    <button id="btnReset" class="reset">Reset fault</button>
+    <p id="msg" class="msg"></p>
+  </section>
+
+  <section class="card wide">
+    <div class="card-head">
+      <h2>Speed</h2>
+      <div class="legend">
+        <span><i style="background:#00b3b3"></i>Actual</span>
+        <span><i style="background:#f0a030"></i>Setpoint</span>
+        <span class="range">
+          <button data-s="60">1 min</button><button data-s="300" class="on">5 min</button><button data-s="600">10 min</button>
+        </span>
+      </div>
+    </div>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Events</h2></div>
+    <ul id="events" class="events"></ul>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>CSV logs</h2></div>
+    <div id="files" class="files"></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const MAX_HZ = 50;
+
+async function poll() {
+  try {
+    const d = await (await fetch('/api/status', { cache: 'no-store' })).json();
+    if (!d.online) {
+      $('conn').className = 'conn err';
+      $('conn').textContent = 'PLC offline';
+      $('conn').title = d.error || '';
+      return;
+    }
+    $('conn').className = 'conn ok';
+    $('conn').textContent = 'PLC online';
+    $('freq').textContent = d.freq_hz.toFixed(1);
+    $('freqBar').style.width = Math.min(100, Math.abs(d.freq_hz) / MAX_HZ * 100) + '%';
+    $('lampRun').className = d.running ? 'green' : '';
+    $('lampFault').className = d.fault ? 'red' : '';
+    $('lampDir').className = 'blue';
+    $('dirText').textContent = d.forward ? 'Forward' : 'Reverse';
+    $('temp').textContent = d.temperature.toFixed(1);
+    $('press').textContent = d.pressure.toFixed(2);
+    $('spPlc').textContent = d.setpoint_hz.toFixed(1);
+    $('cw').textContent = d.control_word;
+    $('btnRev').classList.toggle('on', d.reverse_cmd);
+    $('btnRev').textContent = d.reverse_cmd ? 'REVERSE ⇄ (active)' : 'REVERSE ⇄';
+    history.push([Date.now() / 1000, d.freq_hz, d.setpoint_hz]);
+    drawChart();
+  } catch (e) {
+    $('conn').className = 'conn err';
+    $('conn').textContent = 'server offline';
+  }
+}
+
+async function send(btn, url, body, okText) {
+  btn.disabled = true;
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    });
+    const d = await r.json();
+    $('msg').textContent = d.ok ? okText : 'Error: ' + d.error;
+  } catch (e) {
+    $('msg').textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+$('spSlider').oninput = e => $('spNum').value = e.target.value;
+$('spNum').oninput = e => $('spSlider').value = e.target.value;
+$('btnStart').onclick = e => send(e.target, '/api/start', null, 'Start sent');
+$('btnStop').onclick = e => send(e.target, '/api/stop', null, 'Stop sent');
+$('btnRev').onclick = e => send(e.target, '/api/reverse', null, 'Direction change sent');
+$('btnReset').onclick = e => send(e.target, '/api/reset', null, 'Fault reset sent');
+$('btnSet').onclick = e => {
+  const hz = Math.max(0, Math.min(MAX_HZ, parseFloat($('spNum').value) || 0));
+  $('spNum').value = $('spSlider').value = hz;
+  send(e.target, '/api/setpoint', { hz }, 'Setpoint ' + hz + ' Hz sent');
+};
+
+// ---- Speed graph ----
+let history = [];   // [unix time, actual Hz, setpoint Hz]
+let windowS = 300;
+
+document.querySelectorAll('.range button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.range button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  windowS = +b.dataset.s;
+  drawChart();
+});
+
+function drawChart() {
+  const cv = $('chart'), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const now = Date.now() / 1000, t0 = now - windowS;
+  history = history.filter(p => p[0] >= now - 600);
+  const pts = history.filter(p => p[0] >= t0);
+  const yMin = pts.some(p => p[1] < 0) ? -MAX_HZ : 0, yMax = MAX_HZ;
+  const L = 38, R = 10, T = 8, B = 22;
+  const x = t => L + (t - t0) / windowS * (W - L - R);
+  const y = v => T + (yMax - v) / (yMax - yMin) * (H - T - B);
+
+  // grid + labels
+  ctx.font = '11px Segoe UI, Arial'; ctx.fillStyle = '#9aa4ad'; ctx.strokeStyle = '#2c343d'; ctx.lineWidth = 1;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let v = yMin; v <= yMax; v += 10) {
+    ctx.beginPath(); ctx.moveTo(L, y(v)); ctx.lineTo(W - R, y(v)); ctx.stroke();
+    ctx.fillText(v, L - 6, y(v));
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const step = windowS / 5;
+  for (let i = 0; i <= 5; i++) {
+    const s = windowS - i * step;
+    ctx.fillText(s === 0 ? 'now' : '-' + (s >= 60 ? (s / 60) + 'm' : s + 's'), x(t0 + i * step), H - B + 6);
+  }
+
+  const line = (idx, color, dash) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash(dash);
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(x(p[0]), y(p[idx])) : ctx.moveTo(x(p[0]), y(p[idx])));
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line(2, '#f0a030', [6, 4]);
+  line(1, '#00b3b3', []);
+}
+window.addEventListener('resize', drawChart);
+
+// ---- Events + CSV files ----
+async function loadEvents() {
+  try {
+    const ev = await (await fetch('/api/events', { cache: 'no-store' })).json();
+    $('events').innerHTML = ev.map(e =>
+      '<li><time>' + e.time.slice(11) + '</time>' + e.text.replace(/</g, '&lt;') + '</li>').join('')
+      || '<li>No events yet</li>';
+    const files = await (await fetch('/api/logs', { cache: 'no-store' })).json();
+    $('files').innerHTML = files.map(f => '<a href="/logs/' + encodeURIComponent(f) + '">⤓ ' + f + '</a>').join('')
+      || 'No log files yet';
+  } catch (e) { /* shown by poll() */ }
+}
+
+fetch('/api/history').then(r => r.json()).then(h => { history = h.concat(history); drawChart(); });
+poll();
+loadEvents();
+setInterval(poll, 500);
+setInterval(loadEvents, 2000);
+</script>
+</body>
+</html>

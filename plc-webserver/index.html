@@ -1,0 +1,54 @@
+<!-- AWP_In_Variable Name='"Write_Master_DB".Cmd_Start' -->
+<!-- AWP_In_Variable Name='"Write_Master_DB".Cmd_stop' -->
+<!-- AWP_In_Variable Name='"Write_Master_DB".Setpoint_Freq_Hz' -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>V20 Drive Control</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>V20 Drive</h1>
+    <span id="conn" class="conn">connecting…</span>
+  </header>
+
+  <main>
+    <section class="card status">
+      <div class="big">
+        <span id="freq">--.-</span><small>Hz</small>
+      </div>
+      <div class="bar"><div id="freqBar"></div></div>
+      <div class="lamps">
+        <div class="lamp"><i id="lampRun"></i>Running</div>
+        <div class="lamp"><i id="lampFault"></i>Fault</div>
+        <div class="lamp"><i id="lampDir"></i><span id="dirText">Direction</span></div>
+      </div>
+      <div class="meta">
+        Temperature: <b id="temp">--</b> °C &nbsp;·&nbsp;
+        Setpoint in PLC: <b id="spPlc">--</b> Hz
+      </div>
+    </section>
+
+    <section class="card controls">
+      <div class="buttons">
+        <button id="btnStart" class="start">START</button>
+        <button id="btnStop" class="stop">STOP</button>
+      </div>
+
+      <label for="spSlider">Speed setpoint</label>
+      <div class="sp">
+        <input id="spSlider" type="range" min="0" max="50" step="0.5" value="0">
+        <input id="spNum" type="number" min="0" max="50" step="0.1" value="0">
+        <span>Hz</span>
+      </div>
+      <button id="btnSet" class="set">Send setpoint</button>
+      <p id="msg" class="msg"></p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
